@@ -23,7 +23,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-TOTAL_TOPICS = 40
+TOTAL_TOPICS = 20
 train_df_raw = pd.read_csv('../data/raw/train.csv')
 train_df = train_df_raw.dropna()
 
@@ -58,7 +58,7 @@ df["q2_cleaned"] =  df.apply(lambda x: lemmatizer(x['q2_cleaned']), axis=1)
 
 
 data = df['q1_cleaned'].values.tolist() + df['q2_cleaned'].values.tolist()
-
+"""
 # SKlearn
 vectorizer = CountVectorizer(analyzer='word',       
                              min_df=5, # minimum number of occurences            
@@ -104,7 +104,7 @@ topics={0:'Win/Lose',1:'Life/long',2:'Start/Compare',3:'Time/Create',4:'Love/Say
 df_topic_keywords['topic_theme'] = topics
 df_topic_keywords.set_index('topic_theme', inplace=True)
 df_topic_keywords.T
-
+"""
 
 
 
@@ -120,8 +120,7 @@ from gensim.corpora import Dictionary
 from nltk.corpus import stopwords
 from gensim.utils import simple_preprocess
 stop_words = stopwords.words('english')
-stop_words.extend(['come','order','try','go','get','make','drink','plate','dish','restaurant','place',
-                  'would','really','like','great','service','came','got'])
+
 
 def sent_to_words(sentences):
     for sentence in sentences:
@@ -130,7 +129,7 @@ def sent_to_words(sentences):
 def remove_stopwords(texts):
     return [[word for word in simple_preprocess(str(doc)) if word not in stop_words] for doc in texts]
 
-def bigrams(words, bi_min=15, tri_min=10):
+def bigrams(words, bi_min=15):
     bigram = gensim.models.Phrases(words, min_count = bi_min)
     bigram_mod = gensim.models.phrases.Phraser(bigram)
     return bigram_mod
@@ -147,6 +146,13 @@ def get_corpus(df):
     corpus = [id2word.doc2bow(text) for text in bigram]
     return corpus, id2word, bigram
 
+def get_topic(caption):
+    result=lda_model[train_id2word.doc2bow(caption)][0]
+    d={}
+    for i in result:
+        d[i[0]]=i[1]
+    key=max(d, key=d.get)
+    return topics[key]
 
 train = pd.DataFrame({'text':data})
 train_corpus, train_id2word, bigram_train = get_corpus(train)
@@ -171,3 +177,26 @@ doc_lda = lda_model[train_corpus]
 coherence_model_lda = CoherenceModel(model=lda_model, texts=bigram_train, dictionary=train_id2word, coherence='c_v')
 coherence_lda = coherence_model_lda.get_coherence()
 print('\nCoherence Score: ', coherence_lda)
+
+
+topics={0:'People',1:'Work/Tech/App',2:'Life',3:'Politics',4:'Knowledge',5:'Education',6:'Language/Good', 
+        7:'India/Food', 8: 'One/Feeling', 9: 'Job/Design', 10: 'World/Country/War', 11: 'Year/Age/Experience',
+        12: 'Money/Sex', 13: 'Movie/Ever/Imrpove', 14: 'Time/Travel'}
+
+
+lemm_dfq1 = pd.DataFrame({'Text':bigram_train[0:404287]})
+lemm_dfq2 = pd.DataFrame({'Text':bigram_train[404287:]})
+
+
+
+train_df['q1_cleaned'] = lemm_dfq1['Text']
+train_df['q2_cleaned'] = lemm_dfq2['Text']
+
+train_df['q1_cleaned'].explode().dropna().groupby(level=0).agg(list)
+train_df['q2_cleaned'].explode().dropna().groupby(level=0).agg(list)
+
+
+train_df.loc[:, 'q1_topic']=train_df['q1_cleaned'].apply(lambda x: get_topic(x))
+train_df.loc[:, 'q2_topic']=train_df['q2_cleaned'].apply(lambda x: get_topic(x))
+
+train_df.to_csv('../data/processed/train_w_topic_model.csv')
