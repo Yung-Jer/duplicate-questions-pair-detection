@@ -19,9 +19,6 @@ from pprint import pprint
 import numpy as np
 
 
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
 
 TOTAL_TOPICS = 20
 train_df_raw = pd.read_csv('../data/raw/train.csv')
@@ -53,8 +50,8 @@ def lemmatizer(text):
         sent.append(word.lemma_)
     return " ".join(sent)
     
-df["q1_cleaned"] =  df.apply(lambda x: lemmatizer(x['q1_cleaned']), axis=1)
-df["q2_cleaned"] =  df.apply(lambda x: lemmatizer(x['q2_cleaned']), axis=1)
+#df["q1_cleaned"] =  df.apply(lambda x: lemmatizer(x['q1_cleaned']), axis=1)
+#df["q2_cleaned"] =  df.apply(lambda x: lemmatizer(x['q2_cleaned']), axis=1)
 
 
 data = df['q1_cleaned'].values.tolist() + df['q2_cleaned'].values.tolist()
@@ -158,15 +155,16 @@ train = pd.DataFrame({'text':data})
 train_corpus, train_id2word, bigram_train = get_corpus(train)
 
 
-
+"""
 lda_model = gensim.models.ldamodel.LdaModel(
                           num_topics = 15, # Number of topics        
                           corpus = train_corpus,
                           id2word = train_id2word, 
                           random_state=20,      
-                          passes = 50,
-                          alpha = 'auto',
-                          update_every=1,       
+                          passes = 10, #how many times the algorithm is supposed to pass over the whole corpus
+                          alpha = 'auto', # to let it learn the priors
+                          update_every=1, # update the model every update_every chunksize chunks
+                          chunksize = 100, #number of documents to consider at once (affects the memory consumption)
                           per_word_topics=True,
                           )
 pprint(lda_model.print_topics())
@@ -196,7 +194,38 @@ train_df['q1_cleaned'].explode().dropna().groupby(level=0).agg(list)
 train_df['q2_cleaned'].explode().dropna().groupby(level=0).agg(list)
 
 
-train_df.loc[:, 'q1_topic']=train_df['q1_cleaned'].apply(lambda x: get_topic(x))
-train_df.loc[:, 'q2_topic']=train_df['q2_cleaned'].apply(lambda x: get_topic(x))
+train_df.loc[:, 'q1_topic']=train_df['q1_cleaned'].apply(lambda x: get_topic(x) if type(x)==list else 'None')
+train_df.loc[:, 'q2_topic']=train_df['q2_cleaned'].apply(lambda x: get_topic(x) if type(x)==list else 'None')
 
-train_df.to_csv('../data/processed/train_w_topic_model.csv')
+train_df.reset_index().to_feather('../data/processed/train_w_topic_model.feather')
+"""
+# Try this 
+#https://stackoverflow.com/questions/32313062/what-is-the-best-way-to-obtain-the-optimal-number-of-topics-for-a-lda-model-usin
+
+# Testing
+def calculate_coherence_score(n, alpha, beta):
+    lda_model = gensim.models.ldamodel.LdaModel(corpus=train_corpus,
+                                           id2word=train_id2word,
+                                           num_topics=n, 
+                                           random_state=100,
+                                           update_every=1,
+                                           chunksize=100,
+                                           passes=10,
+                                           alpha=alpha,
+                                           per_word_topics=True,
+                                           eta = beta)
+    coherence_model_lda = CoherenceModel(model=lda_model, texts=bigram_train, dictionary=train_id2word, coherence='c_v')
+    coherence_lda = coherence_model_lda.get_coherence()
+    return coherence_lda
+
+#list containing various hyperparameters
+no_of_topics = [10,12,15,20]
+alpha_list = ['symmetric',0.3,0.5,0.7]
+beta_list = ['auto',0.3,0.5,0.7]
+
+# n : 7 ; alpha : symmetric ; beta : 0.5 ; Score : 0.2914646846171962 highest so far
+for n in no_of_topics:
+    for alpha in alpha_list:
+        for beta in beta_list:
+            coherence_score = calculate_coherence_score(n, alpha, beta)
+            print(f"n : {n} ; alpha : {alpha} ; beta : {beta} ; Score : {coherence_score}")
