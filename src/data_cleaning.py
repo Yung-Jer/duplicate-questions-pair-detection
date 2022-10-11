@@ -49,7 +49,7 @@ df['q2_cleaned'] = df['question1'].apply(_lookup_words)
 
 df = df[['q1_cleaned', 'q2_cleaned', 'is_duplicate']]
 
-df.to_csv("processed.csv", index = False)
+df.to_csv("../data/processed/clean_data.csv", index = False)
 
 
 
