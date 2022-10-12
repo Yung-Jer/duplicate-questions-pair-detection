@@ -6,7 +6,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-topic_df = pd.read_feather('../data/processed/train_w_topic_model.feather')
+topic_df = pd.read_feather('../data/processed/train_w_topic_model_w_clean_data.feather')
 
 # remove null values first
 topic_df.dropna(inplace=True)
@@ -18,10 +18,10 @@ topic_df['q2_start'] = topic_df['q2_cleaned'].apply(lambda x: x.split()[0] if le
 
 def longestCommonSubsequence(text1: str, text2: str) -> int:
         _seen = {}
-        n, m = len(text1), len(text2)
+        m, n = len(text1), len(text2)
         
         def dp(i, j):
-            if i == n or j == m:
+            if i == m or j == n:
                 return 0
             elif (i, j) in _seen:
                 return _seen[(i, j)]
@@ -35,22 +35,21 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
         return dp(0, 0)
 
 def longestCommonSubstring(text1: str, text2: str) -> int:
-        _seen = {}
-        n, m = len(text1), len(text2)
-        
-        def dp(i, j):
-            if i == n or j == m:
-                return 0
-            elif (i, j) in _seen:
-                return _seen[(i, j)]
-            count = 0
-            if text1[i] == text2[j]:
-                count = 1 + dp(i+1, j+1)
-            count = max(count, dp(i+1, j), dp(i, j+1))
-            _seen[(i, j)] = count
-            return count
-        
-        return dp(0, 0)
+        m, n = len(text1), len(text2)
+
+        T = [[0 for _ in range(n + 1)] for _ in range(m + 1)]
+        res = 0
+
+        for i in range(m):
+            for j in range(n):
+                if i == 0 or j == 0:
+                    T[i][j] = 0
+                if text1[i] == text2[j]:
+                    T[i][j] = T[i - 1][j - 1] + 1
+                    res = max(res, T[i][j])
+                else:
+                    T[i][j] == 0
+        return res
 
 topic_df['lc_substring'] = topic_df.apply(lambda x: longestCommonSubstring(x['q1_cleaned'], x['q2_cleaned']), axis=1)
 topic_df['lc_subsequence'] = topic_df.apply(lambda x: longestCommonSubsequence(x['q1_cleaned'], x['q2_cleaned']), axis=1)
