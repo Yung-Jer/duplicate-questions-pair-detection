@@ -1,20 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Oct 10 23:17:27 2022
+
+@author: Calven Ng, Tay Xun Yang, Wong Yung Jer, Cheang Xue Ting, Tiara Lau
+"""
+
 import pandas as pd
-
-import os
-  
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-
-topic_df = pd.read_feather('../data/processed/train_w_topic_model.feather')
-
-# remove null values first
-topic_df.dropna(inplace=True)
-print(topic_df['q1_cleaned'].apply(lambda x: len(x)).describe())
-print(topic_df['q2_cleaned'].apply(lambda x: len(x)).describe())
-
-topic_df['q1_start'] = topic_df['q1_cleaned'].apply(lambda x: x.split()[0] if len(x.split()) > 0 else '')
-topic_df['q2_start'] = topic_df['q2_cleaned'].apply(lambda x: x.split()[0] if len(x.split()) > 0 else '')
 
 def longestCommonSubsequence(text1: str, text2: str) -> int:
         _seen = {}
@@ -52,7 +43,22 @@ def longestCommonSubstring(text1: str, text2: str) -> int:
         
         return dp(0, 0)
 
-topic_df['lc_substring'] = topic_df.apply(lambda x: longestCommonSubstring(x['q1_cleaned'], x['q2_cleaned']), axis=1)
-topic_df['lc_subsequence'] = topic_df.apply(lambda x: longestCommonSubsequence(x['q1_cleaned'], x['q2_cleaned']), axis=1)
+def build_lcs(df, verbose = False):
+    if verbose: print(df['q1_cleaned'].apply(lambda x: len(x)).describe())
+    if verbose: print(df['q2_cleaned'].apply(lambda x: len(x)).describe())
+    
+    if verbose: print("Building longest common substring and longest common subsequence...")
+    df['q1_start'] = df['q1_cleaned'].apply(lambda x: x.split()[0] if len(x.split()) > 0 else '')
+    df['q2_start'] = ['q2_cleaned'].apply(lambda x: x.split()[0] if len(x.split()) > 0 else '')
+    
+    df['lc_substring'] = df.apply(lambda x: longestCommonSubstring(x['q1_cleaned'], x['q2_cleaned']), axis=1)
+    df['lc_subsequence'] = df.apply(lambda x: longestCommonSubsequence(x['q1_cleaned'], x['q2_cleaned']), axis=1)
+    return df
 
-# topic_df.to_feather('../data/processed/train_w_topic_model_w_clean_data_w_lcs.feather')
+if __name__ == '__main__':
+    topic_df = pd.read_feather('../data/processed/train_w_topic_model.feather')
+
+    # remove null values first
+    topic_df.dropna(inplace=True)
+    topic_df = build_lcs(topic_df)
+    #topic_df.to_feather('../data/processed/train_w_topic_model_w_clean_data_w_lcs.feather')

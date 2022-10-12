@@ -27,12 +27,6 @@ train_df = pd.read_feather('../data/processed/train_clean.feather')
 
 
 def prep_data_for_topic_modeling(df):
-    df.drop('index', axis=1, inplace=True)
-    df['q1_topic_cleaned'] = pd.DataFrame(df.question1.apply(lambda x: clean_text_for_topic(x)))
-    df['q2_topic_cleaned'] = pd.DataFrame(df.question2.apply(lambda x: clean_text_for_topic(x)))
-    data = df['q1_cleaned'].values.tolist() + df['q2_cleaned'].values.tolist()
-    return data
-    
     def clean_text_for_topic(text):
         '''Make text lowercase, remove text in square brackets, remove punctuation and remove words containing numbers.'''
         text = text.lower()
@@ -41,6 +35,12 @@ def prep_data_for_topic_modeling(df):
         text = re.sub(r"\'", "", text)
         text = re.sub(r'\w*\d\w*', '', text)
         return text
+    
+    df.drop('index', axis=1, inplace=True)
+    df['q1_topic_cleaned'] = pd.DataFrame(df.question1.apply(lambda x: clean_text_for_topic(x)))
+    df['q2_topic_cleaned'] = pd.DataFrame(df.question2.apply(lambda x: clean_text_for_topic(x)))
+    data = df['q1_cleaned'].values.tolist() + df['q2_cleaned'].values.tolist() # Concatenate q1 and q2 into one column
+    return data
 
 def sent_to_words(sentences):
     for sentence in sentences:
