@@ -46,7 +46,7 @@ def _lookup_words(text):
 df['q1_cleaned'] = df['question1'].apply(_lookup_words)
 
 
-df['q2_cleaned'] = df['question1'].apply(_lookup_words)
+df['q2_cleaned'] = df['question2'].apply(_lookup_words)
 
 
 #df = df[['q1_cleaned', 'q2_cleaned']]
