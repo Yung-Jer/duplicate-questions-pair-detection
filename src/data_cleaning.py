@@ -60,6 +60,8 @@ df.reset_index().to_feather("../data/processed/train_clean.feather")
 #df_merged = pd.concat([topic_df, df], axis = 1).drop(['index','id', 'question1','question2'], axis=1)
 
 
-
 #print(df_merged.columns)
 #df_merged.to_feather('../data/processed/train_w_topic_model_w_clean_data.feather')
+
+
+
