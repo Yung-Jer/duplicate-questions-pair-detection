@@ -56,9 +56,9 @@ def build_lcs(df, verbose = False):
     return df
 
 if __name__ == '__main__':
-    topic_df = pd.read_feather('../data/processed/train_clean.feather')
+    topic_df = pd.read_feather('../data/processed/full_clean.feather')
 
     # remove null values first
     topic_df.dropna(inplace=True)
     topic_df = build_lcs(topic_df)
-    topic_df.to_feather('../data/processed/train_w_lcs.feather')
+    topic_df.to_feather('../data/processed/full_w_lcs.feather')

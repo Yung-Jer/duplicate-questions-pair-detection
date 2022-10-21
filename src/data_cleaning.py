@@ -51,7 +51,7 @@ df['q2_cleaned'] = df['question2'].apply(_lookup_words)
 
 #df = df[['q1_cleaned', 'q2_cleaned']]
 #df = df[['q1_cleaned', 'q2_cleaned', 'is_duplicate']]
-df.reset_index().to_feather("../data/processed/train_clean.feather")
+df.reset_index().to_feather("../data/processed/full_clean.feather")
 
 #topic_df = pd.read_feather('../data/processed/train_w_topic_model.feather')
 

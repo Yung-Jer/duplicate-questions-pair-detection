@@ -8,14 +8,15 @@ Created on Wed Oct  5 23:17:27 2022
 """
 # python3 -m spacy download enimport numpy as np
 import pandas as pd
-
+import numpy as np
 from nltk.corpus import stopwords
 import re
 # Gensim
 import gensim
-from gensim.models import LdaModel
 from gensim.models.coherencemodel import CoherenceModel
 from gensim.utils import simple_preprocess
+import seaborn as sns
+import matplotlib.pyplot as plt
 stop_words = stopwords.words('english')
 
 
@@ -36,7 +37,7 @@ def prep_data_for_topic_modeling(df):
         text = re.sub(r'\w*\d\w*', '', text)
         return text
     
-    df.drop('index', axis=1, inplace=True)
+    df.drop('index', axis=1, inplace=True) # As we read from feather, there is extra column index
     df['q1_topic_cleaned'] = pd.DataFrame(df.question1.apply(lambda x: clean_text_for_topic(x)))
     df['q2_topic_cleaned'] = pd.DataFrame(df.question2.apply(lambda x: clean_text_for_topic(x)))
     data = df['q1_cleaned'].values.tolist() + df['q2_cleaned'].values.tolist() # Concatenate q1 and q2 into one column
@@ -79,17 +80,54 @@ train = pd.DataFrame({'text':data})
 train_corpus, train_id2word, bigram_train = get_corpus(train)
 
 
-"""
+# Considering 1-15 topics, as the last is cut off
+num_topics = [7,10,15,20,25,30]
+num_keywords = 15
+
+LDA_models = {}
+LDA_topics = {}
+for i in num_topics:
+    LDA_models[i] =  gensim.models.ldamodel.LdaModel(corpus=train_corpus,
+                             id2word=train_id2word,
+                             num_topics=i,
+                             update_every=1,
+                             chunksize=len(train_corpus),
+                             passes=20,
+                             alpha='auto',
+                             random_state=20)
+
+    shown_topics = LDA_models[i].show_topics(num_topics=i, 
+                                             num_words=num_keywords,
+                                             formatted=False)
+    LDA_topics[i] = [[word[0] for word in topic[1]] for topic in shown_topics]
+
+
+                
+
+coherences = [CoherenceModel(model=LDA_models[i], texts=bigram_train, dictionary=train_id2word, coherence='c_v').get_coherence()\
+              for i in num_topics[:-1]]
+
+
+ax = sns.lineplot(x=num_topics[:-1], y=coherences, label='Topic Coherence')
+
+ax.set_xlim([1, num_topics[-1]-1])
+                
+ax.axes.set_title('Model Metrics per Number of Topics', fontsize=25)
+ax.set_ylabel('Metric Level', fontsize=20)
+ax.set_xlabel('Number of Topics', fontsize=20)
+plt.legend(fontsize=20)
+plt.show()  
+
+
 lda_model = gensim.models.ldamodel.LdaModel(
-                          num_topics = 15, # Number of topics        
+                          num_topics = 25, # Number of topics        
                           corpus = train_corpus,
                           id2word = train_id2word, 
                           random_state=20,      
-                          passes = 10, #how many times the algorithm is supposed to pass over the whole corpus
+                          passes = 30, #how many times the algorithm is supposed to pass over the whole corpus
                           alpha = 'auto', # to let it learn the priors
                           update_every=1, # update the model every update_every chunksize chunks
-                          chunksize = 100, #number of documents to consider at once (affects the memory consumption)
-                          per_word_topics=True,
+                          chunksize = len(train_corpus), #number of documents to consider at once (affects the memory consumption)
                           )
 pprint(lda_model.print_topics())
 doc_lda = lda_model[train_corpus]
@@ -140,8 +178,8 @@ def calculate_coherence_score(n, alpha, beta):
     return coherence_lda
 
 #list containing various hyperparameters
-no_of_topics = [12,15,20]
-alpha_list = ['symmetric',0.3,0.5,0.7]
+no_of_topics = [20]
+alpha_list = [0.3,0.5,0.7]
 beta_list = [0.3,0.5,0.7]
 
 # n : 7 ; alpha : symmetric ; beta : 0.5 ; Score : 0.2914646846171962 highest so far
