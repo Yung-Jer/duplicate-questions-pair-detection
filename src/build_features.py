@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 
 # Variables Setting 
 verbose = True
-TOTAL_TOPICS = 20
+TOTAL_TOPICS = 25
 
 def levenshtein(row):
     s1 = row['question1']
@@ -56,6 +56,22 @@ def jaccard_similarity(row):
         return 0
     return float(len(intersection))/float(len(union))
 
+def same_starting(q1, q2):
+    q1 = q1.split()
+    q2 = q2.split()
+    
+    if q1[0] == q2[0]:
+        return 1
+    return 0
+
+def same_ending(q1, q2):
+    q1 = q1.split()
+    q2 = q2.split()
+    
+    if q1[-1] == q2[-1]:
+        return 1
+    return 0
+
 if __name__ ==  '__main__':
     tic = time.time()
     # Read data
@@ -63,20 +79,68 @@ if __name__ ==  '__main__':
     
     df['q1_trimmed'] = df['q1_cleaned'].apply(lambda x: trim_sentence(x))
     df['q2_trimmed'] = df['q2_cleaned'].apply(lambda x: trim_sentence(x))
-    
+    df['exactly_same'] = (df['question1'] == df['question2']).astype(int)
+    df['freq_q1']=df.groupby('q1_cleaned')['q1_cleaned'].transform('count') # Frequency of question 1 in entire dataset
+    df['freq_q2']=df.groupby('q2_cleaned')['q2_cleaned'].transform('count') # Frequencyt of question 2 in entire dataset
+    df['freq_q1+q2'] = df['freq_q1']+df['freq_q2'] # Sum of frequency of question 1 and question 2
+    df['freq_q1-q2'] = df['freq_q1']-df['freq_q2'] # Difference of frequency in question 1 and question 2
+    df['q1_question_mark_count'] = df.apply(lambda x: x['question1'].count('?'), axis=1)
+    df['q2_question_mark_count'] = df.apply(lambda x: x['question2'].count('?'), axis=1)
+    df['question_mark_count_diff'] = df['q1_question_mark_count'] - df['q2_question_mark_count']
     df['Levenshtein'] = df.apply(levenshtein, axis=1)
     df['jaccard_dist'] = df.apply(jaccard_similarity, axis=1)
     df['common_words'] = df.apply(common_words, axis=1)
-    df['common_ratio'] = df.apply(lambda row: row['common_words'] / (len(row['q1_cleaned']) + len(row['q2_cleaned'])), axis=1)
+    df['common_ratio'] = df.apply(lambda row: row['common_words'] / (len(row['q1_cleaned']) + len(row['q2_cleaned'])), axis=1) #Common words / Total Words
     df['length_diff'] = df.question1.apply(lambda x: len(str(x))) - df.question2.apply(lambda x: len(str(x)))
     df['fuzz_qratio'] = df.apply(lambda x: fuzz.QRatio(str(x['question1']), str(x['question2'])), axis=1)
     df['fuzz_wratio'] = df.apply(lambda x: fuzz.WRatio(str(x['question1']), str(x['question2'])), axis=1)
+    df["same_starting"] = df.apply(lambda x: same_starting(x.question1, x.question2), axis=1) # if first word is same, 1 else 0
+    df["same_ending"] = df.apply(lambda x: same_ending(x.question1, x.question2), axis=1) # if last word is same, 1 else 0
+
     # Build Longest Common Substring and Sub Sequence as a new feature
     df = sw.build_lcs(df, verbose)
     
     # Topic Modeling
+    data = tm.prep_data_for_topic_modeling(df)
+    train = pd.DataFrame({'text':data})
+    train_corpus, train_id2word, bigram_train = tm.get_corpus(train)
+    
+    lda_model = tm.build_topic_model(TOTAL_TOPICS, train_corpus, train_id2word, True)
+    doc_lda = lda_model[train_corpus]
+    pd.set_option('display.max_columns', None)  
+    print(tm.get_lda_topics(lda_model, TOTAL_TOPICS))
+    
+    topics={0:'Social Media/Gadget/Email',1:'Self-help/Learn/Business',2:'Purpose/Energy',3:'Language/Relationship',4:'Food/Health',5:'Interview/Difference/Drug',6:'Year/New/Stock/Company', 
+            7:'Job/College/University', 8: 'India/Government/China', 9: 'English/Law/Writing', 10: 'Money/Bank/Online', 11: 'Relationship/Girl/Guy/People/Life',
+            12: 'Politics/Trump/Election', 13: 'Assessment/Word/Home', 14: 'Country/Car/Show/Television', 15: 'Free/Ocatopm/Software/Website', 16: 'Engine/Password/Search',
+            17: 'Long/Review/Work/Compare', 18: 'Best/Way/Visit', 19: 'Lose/Weight/Time/Travel/Salary', 20: 'Quora/Question/Google/Answer', 21: 'Problem/Increase', 22: 'Sex/Woman/Man',
+            23: 'Movie/Video Game/Youtube', 24: 'United States/Day'}
+    
+    lemm_dfq1 = pd.DataFrame({'Text':bigram_train[0:404287]})
+    lemm_dfq2 = pd.DataFrame({'Text':bigram_train[404287:]})
+
+    df['q1_cleaned_t'] = lemm_dfq1['Text']
+    df['q2_cleaned_t'] = lemm_dfq2['Text']
+
+    df['q1_cleaned_t'].explode().dropna().groupby(level=0).agg(list)
+    df['q2_cleaned_t'].explode().dropna().groupby(level=0).agg(list)
+
+    df.loc[:, 'q1_topic']=df['q1_cleaned_t'].apply(lambda x: tm.get_topic(x, topics) if type(x)==list else 'None')
+    df.loc[:, 'q2_topic']=df['q2_cleaned_t'].apply(lambda x: tm.get_topic(x, topics) if type(x)==list else 'None')
+
+    df['same_topic'] = (df['q1_topic'] == df['q2_topic']).astype(int)
     
     
+    # Rearrange Columns
+    df = df[['qid1', 'qid2', 'question1','question2', 'q1_cleaned', 'q2_cleaned',
+           'q1_trimmed', 'q2_trimmed', 'q1_start', 'q2_start', 'q1_topic','q2_topic', 'length_diff','same_question',
+           'lc_substring', 'lc_subsequence', 'jaccard_dist', 'common_words',
+           'common_ratio', 'levenshtein', 'fuzz_qratio', 'fuzz_wratio',
+           'q2_question_mark_count', 'q1_question_mark_count','question_mark_count_diff',
+           'freq_q1+q2','freq_q1-q2','same_topic','same_starting','same_ending','is_duplicate']]
+    
+    # Output full dataset
+    df.reset_index().to_feather('../data/processed/full_dataset.feather')
     # Split dataset into train/validation/test sets
     # We want to split the data in 80:10:10 for train:valid:test dataset
     train_size=0.8
@@ -85,13 +149,13 @@ if __name__ ==  '__main__':
     y = df['is_duplicate']
     
     # Split dataset into training and remaining (val+test) set first
-    X_train, X_rem, y_train, y_rem = train_test_split(X,y, train_size=0.8, stratify=y)
+    X_train, X_rem, y_train, y_rem = train_test_split(X,y, train_size=0.8, stratify=y, random_state = 42)
     
     # Split remaining set equally 10:10
     test_size = 0.5
-    X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5,stratify=y_rem)
+    X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5,stratify=y_rem, random_state = 42)
     
-    df.reset_index().to_feather('../data/processed/full_dataset.feather')
+    
     
     # Join the x and y back together column-wise, and output
     train_set = pd.concat([X_train, y_train], axis=1)

@@ -8,20 +8,18 @@ Created on Wed Oct  5 23:17:27 2022
 """
 # python3 -m spacy download enimport numpy as np
 import pandas as pd
-import numpy as np
 from nltk.corpus import stopwords
 import re
 # Gensim
 import gensim
 from gensim.models.coherencemodel import CoherenceModel
 from gensim.utils import simple_preprocess
-import seaborn as sns
-import matplotlib.pyplot as plt
+import pprint
 stop_words = stopwords.words('english')
 
-
-TOTAL_TOPICS = 20
-train_df = pd.read_feather('../data/processed/train_clean.feather')
+num_topics = [7,10,15,20,25,30]
+num_keywords = 15
+train_df = pd.read_feather('../data/processed/full_clean.feather')
 
 
 # We should try not to do too much of text pre-processing, because most of the questions are short, removing more words risks of losing meaning.
@@ -67,176 +65,88 @@ def get_corpus(df):
     corpus = [id2word.doc2bow(text) for text in bigram]
     return corpus, id2word, bigram
 
-def get_topic(caption, lda_model, topics):
+def get_topic(caption, topics):
     result=lda_model[train_id2word.doc2bow(caption)][0]
     d={}
-    for i in result:
-        d[i[0]]=i[1]
+    d[result[0]]=result[1]
     key=max(d, key=d.get)
     return topics[key]
 
-data = prep_data_for_topic_modeling(train_df)
-train = pd.DataFrame({'text':data})
-train_corpus, train_id2word, bigram_train = get_corpus(train)
 
+def get_lda_topics(model, num_topics):
+    word_dict = {};
+    for i in range(num_topics):
+        words = model.show_topic(i, topn = 10);
+        word_dict['Topic # ' + '{:02d}'.format(i+1)] = [i[0] for i in words];
+    return pd.DataFrame(word_dict);
 
-# Considering 1-15 topics, as the last is cut off
-num_topics = [7,10,15,20,25,30]
-num_keywords = 15
+def scan_topic_modeling(num_topics):
+    # Searches for optimal topic count based on coherence
+    LDA_models = {}
+    LDA_topics = {}
+    for i in num_topics:
+        LDA_models[i] =  gensim.models.ldamodel.LdaModel(corpus=train_corpus,
+                                 id2word=train_id2word,
+                                 num_topics=i,
+                                 update_every=1,
+                                 chunksize=len(train_corpus),
+                                 passes=20,
+                                 alpha='auto',
+                                 random_state=20)
 
-LDA_models = {}
-LDA_topics = {}
-for i in num_topics:
-    LDA_models[i] =  gensim.models.ldamodel.LdaModel(corpus=train_corpus,
-                             id2word=train_id2word,
-                             num_topics=i,
-                             update_every=1,
-                             chunksize=len(train_corpus),
-                             passes=20,
-                             alpha='auto',
-                             random_state=20)
+        shown_topics = LDA_models[i].show_topics(num_topics=i, 
+                                                 num_words=num_keywords,
+                                                 formatted=False)
+        LDA_topics[i] = [[word[0] for word in topic[1]] for topic in shown_topics]
+    coherences = [CoherenceModel(model=LDA_models[i], texts=bigram_train, dictionary=train_id2word, coherence='c_v').get_coherence()\
+                  for i in num_topics[:-1]]
+    return coherences
 
-    shown_topics = LDA_models[i].show_topics(num_topics=i, 
-                                             num_words=num_keywords,
-                                             formatted=False)
-    LDA_topics[i] = [[word[0] for word in topic[1]] for topic in shown_topics]
-
-
-                
-
-coherences = [CoherenceModel(model=LDA_models[i], texts=bigram_train, dictionary=train_id2word, coherence='c_v').get_coherence()\
-              for i in num_topics[:-1]]
-
-
-ax = sns.lineplot(x=num_topics[:-1], y=coherences, label='Topic Coherence')
-
-ax.set_xlim([1, num_topics[-1]-1])
-                
-ax.axes.set_title('Model Metrics per Number of Topics', fontsize=25)
-ax.set_ylabel('Metric Level', fontsize=20)
-ax.set_xlabel('Number of Topics', fontsize=20)
-plt.legend(fontsize=20)
-plt.show()  
-
-
-lda_model = gensim.models.ldamodel.LdaModel(
-                          num_topics = 25, # Number of topics        
-                          corpus = train_corpus,
-                          id2word = train_id2word, 
-                          random_state=20,      
-                          passes = 30, #how many times the algorithm is supposed to pass over the whole corpus
-                          alpha = 'auto', # to let it learn the priors
-                          update_every=1, # update the model every update_every chunksize chunks
-                          chunksize = len(train_corpus), #number of documents to consider at once (affects the memory consumption)
-                          )
-pprint(lda_model.print_topics())
-doc_lda = lda_model[train_corpus]
-
-# Compute Coherence Score
-coherence_model_lda = CoherenceModel(model=lda_model, texts=bigram_train, dictionary=train_id2word, coherence='c_v')
-coherence_lda = coherence_model_lda.get_coherence()
-print('\nCoherence Score: ', coherence_lda)
-
-
-topics={0:'People',1:'Work/Tech/App',2:'Life',3:'Politics',4:'Knowledge',5:'Education',6:'Language/Good', 
-        7:'India/Food', 8: 'One/Feeling', 9: 'Job/Design', 10: 'World/Country/War', 11: 'Year/Age/Experience',
-        12: 'Money/Sex', 13: 'Movie/Ever/Imrpove', 14: 'Time/Travel'}
-
-
-lemm_dfq1 = pd.DataFrame({'Text':bigram_train[0:404287]})
-lemm_dfq2 = pd.DataFrame({'Text':bigram_train[404287:]})
-
-train_df['q1_cleaned'] = lemm_dfq1['Text']
-train_df['q2_cleaned'] = lemm_dfq2['Text']
-
-train_df['q1_cleaned'].explode().dropna().groupby(level=0).agg(list)
-train_df['q2_cleaned'].explode().dropna().groupby(level=0).agg(list)
-
-
-train_df.loc[:, 'q1_topic']=train_df['q1_cleaned'].apply(lambda x: get_topic(x, lda_model, topics) if type(x)==list else 'None')
-train_df.loc[:, 'q2_topic']=train_df['q2_cleaned'].apply(lambda x: get_topic(x, lda_model, topics) if type(x)==list else 'None')
-
-train_df.reset_index().to_feather('../data/processed/train_w_topic_model.feather')
-"""
-# Try this 
-#https://stackoverflow.com/questions/32313062/what-is-the-best-way-to-obtain-the-optimal-number-of-topics-for-a-lda-model-usin
-
-# Scan for optimal parameters
-def calculate_coherence_score(n, alpha, beta):
-    lda_model = gensim.models.ldamodel.LdaModel(corpus=train_corpus,
-                                           id2word=train_id2word,
-                                           num_topics=n, 
-                                           random_state=100,
-                                           update_every=1,
-                                           chunksize=100,
-                                           passes=10,
-                                           alpha=alpha,
-                                           per_word_topics=True,
-                                           eta = beta)
+def build_topic_model(num_topics, train_corpus, train_id2word, verbose = False):
+    # Build gensim model
+    lda_model = gensim.models.ldamodel.LdaModel(
+                              num_topics = num_topics, # Number of topics        
+                              corpus = train_corpus,
+                              id2word = train_id2word, 
+                              random_state=20,      
+                              passes = 30, #how many times the algorithm is supposed to pass over the whole corpus
+                              alpha = 'auto', # to let it learn the priors
+                              update_every=1, # update the model every update_every chunksize chunks
+                              chunksize = len(train_corpus), #number of documents to consider at once (affects the memory consumption)
+                              )
     coherence_model_lda = CoherenceModel(model=lda_model, texts=bigram_train, dictionary=train_id2word, coherence='c_v')
     coherence_lda = coherence_model_lda.get_coherence()
-    return coherence_lda
+    if verbose: print('\nCoherence Score: ', coherence_lda)
+    return lda_model
 
-#list containing various hyperparameters
-no_of_topics = [20]
-alpha_list = [0.3,0.5,0.7]
-beta_list = [0.3,0.5,0.7]
+if __name__ ==  '__main__':
+    # Search for optimal topic count
+    coh_list = scan_topic_modeling(num_topics)
+    data = prep_data_for_topic_modeling(train_df)
+    train = pd.DataFrame({'text':data})
+    train_corpus, train_id2word, bigram_train = get_corpus(train)
 
-# n : 7 ; alpha : symmetric ; beta : 0.5 ; Score : 0.2914646846171962 highest so far
-for n in no_of_topics:
-    for alpha in alpha_list:
-        for beta in beta_list:
-            coherence_score = calculate_coherence_score(n, alpha, beta)
-            print(f"n : {n} ; alpha : {alpha} ; beta : {beta} ; Score : {coherence_score}")
+    lda_model = build_topic_model(25, train_corpus, train_id2word, True)
+    doc_lda = lda_model[train_corpus]
+    pd.set_option('display.max_columns', None)  
+    pprint.pprint(get_lda_topics(lda_model, 25))
 
+    topics={0:'Social Media/Gadget/Email',1:'Self-help/Learn/Business',2:'Purpose/Energy',3:'Language/Relationship',4:'Food/Health',5:'Interview/Difference/Drug',6:'Year/New/Stock/Company', 
+        7:'Job/College/University', 8: 'India/Government/China', 9: 'English/Law/Writing', 10: 'Money/Bank/Online', 11: 'Relationship/Girl/Guy/People/Life',
+        12: 'Politics/Trump/Election', 13: 'Assessment/Word/Home', 14: 'Country/Car/Show/Television', 15: 'Free/Ocatopm/Software/Website', 16: 'Engine/Password/Search',
+        17: 'Long/Review/Work/Compare', 18: 'Best/Way/Visit', 19: 'Lose/Weight/Time/Travel/Salary', 20: 'Quora/Question/Google/Answer', 21: 'Problem/Increase', 22: 'Sex/Woman/Man',
+        23: 'Movie/Video Game/Youtube', 24: 'United States/Day'}
 
-"""
-# SKlearn
-vectorizer = CountVectorizer(analyzer='word',       
-                             min_df=5, # minimum number of occurences            
-                             stop_words='english',             
-                             lowercase=True,                   
-                             token_pattern='[a-zA-Z0-9]{3,}',  
-                             max_features=5000, # max number of unique words
-                            )
+    lemm_dfq1 = pd.DataFrame({'Text':bigram_train[0:404287]})
+    lemm_dfq2 = pd.DataFrame({'Text':bigram_train[404287:]})
 
-data_vectorized = vectorizer.fit_transform(
-    data)
+    train_df['q1_cleaned'] = lemm_dfq1['Text']
+    train_df['q2_cleaned'] = lemm_dfq2['Text']
 
-lda_model = LatentDirichletAllocation(n_components=15, # Number of topics
-                                      learning_method='online',
-                                      random_state=0,       
-                                      max_iter=10,      
-                                      batch_size=128, 
-                                      evaluate_every=1,
-                                      n_jobs = -1  # Use all available CPUs
-                                     )
-lda_output = lda_model.fit_transform(data_vectorized)
+    train_df['q1_cleaned'].explode().dropna().groupby(level=0).agg(list)
+    train_df['q2_cleaned'].explode().dropna().groupby(level=0).agg(list)
 
-def show_topics(vectorizer=vectorizer, lda_model=lda_model, n_words=5):
-    keywords = np.array(vectorizer.get_feature_names())
-    topic_keywords = []
-    for topic_weights in lda_model.components_:
-        top_keyword_locs = (-topic_weights).argsort()[:n_words]
-        topic_keywords.append(keywords.take(top_keyword_locs))
-    return topic_keywords
+    train_df.loc[:, 'q1_topic']=train_df['q1_cleaned'].apply(lambda x: get_topic(x, topics) if type(x)==list else 'None')
+    train_df.loc[:, 'q2_topic']=train_df['q2_cleaned'].apply(lambda x: get_topic(x, topics) if type(x)==list else 'None')
 
-topic_keywords = show_topics(vectorizer=vectorizer, lda_model=lda_model, n_words=5)
-
-df_topic_keywords = pd.DataFrame(topic_keywords)
-df_topic_keywords.columns = ['Word '+str(i) for i in range(df_topic_keywords.shape[1])]
-df_topic_keywords.index = ['Topic '+str(i) for i in range(df_topic_keywords.shape[0])]
-df_topic_keywords
-
-topics={0:'Win/Lose',1:'Life/long',2:'Start/Compare',3:'Time/Create',4:'Love/Say',5:'Way/Learn',
-        6:'Indian/Girl/Buy/Account', 7:'Preparaton', 8: 'Work/Job/Company', 9: 'Day/Old',
-        10: 'English/Person', 11: 'Phone/App', 12: 'Movie/Counrty/World', 13: 'Politics/People/Change', 14: 'Study/High'}
-
-
-df_topic_keywords['topic_theme'] = topics
-df_topic_keywords.set_index('topic_theme', inplace=True)
-df_topic_keywords.T
-
-
-"""
 
