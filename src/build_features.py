@@ -105,7 +105,7 @@ if __name__ ==  '__main__':
     train = pd.DataFrame({'text':data})
     train_corpus, train_id2word, bigram_train = tm.get_corpus(train)
     
-    lda_model = tm.build_topic_model(TOTAL_TOPICS, train_corpus, train_id2word, True)
+    lda_model = tm.build_topic_model(TOTAL_TOPICS, train_corpus, train_id2word, verbose)
     doc_lda = lda_model[train_corpus]
     pd.set_option('display.max_columns', None)  
     print(tm.get_lda_topics(lda_model, TOTAL_TOPICS))
