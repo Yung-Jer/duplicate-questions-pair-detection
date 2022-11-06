@@ -11,6 +11,12 @@ import time
 import Levenshtein
 from fuzzywuzzy import fuzz
 from sklearn.model_selection import train_test_split
+from pyemd import emd
+import numpy as np
+from scipy.stats import skew, kurtosis
+from scipy.spatial.distance import cosine, cityblock,canberra, euclidean, minkowski
+
+
 
 # Variables Setting 
 verbose = True
@@ -72,6 +78,20 @@ def same_ending(q1, q2):
         return 1
     return 0
 
+def get_wmdistance(series):
+    return model.wmdistance(series['q1_trimmed'], series['q2_trimmed'])
+
+def avg_w2v(list_of_sent,model,d):
+    sent_vectors = []
+    for sent in list_of_sent: 
+        doc = [word for word in sent if word in model]
+        if doc:
+            sent_vec = np.mean(model[doc],axis=0)
+        else:
+            sent_vec = np.zeros(d)
+        sent_vectors.append(sent_vec)
+    return sent_vectors
+
 if __name__ ==  '__main__':
     tic = time.time()
     # Read data
@@ -79,9 +99,9 @@ if __name__ ==  '__main__':
     
     df['q1_trimmed'] = df['q1_cleaned'].apply(lambda x: trim_sentence(x))
     df['q2_trimmed'] = df['q2_cleaned'].apply(lambda x: trim_sentence(x))
-    df['exactly_same'] = (df['question1'] == df['question2']).astype(int)
+    df['same_question'] = (df['question1'] == df['question2']).astype(int)
     df['freq_q1']=df.groupby('q1_cleaned')['q1_cleaned'].transform('count') # Frequency of question 1 in entire dataset
-    df['freq_q2']=df.groupby('q2_cleaned')['q2_cleaned'].transform('count') # Frequencyt of question 2 in entire dataset
+    df['freq_q2']=df.groupby('q2_cleaned')['q2_cleaned'].transform('count') # Frequency of question 2 in entire dataset
     df['freq_q1+q2'] = df['freq_q1']+df['freq_q2'] # Sum of frequency of question 1 and question 2
     df['freq_q1-q2'] = df['freq_q1']-df['freq_q2'] # Difference of frequency in question 1 and question 2
     df['q1_question_mark_count'] = df.apply(lambda x: x['question1'].count('?'), axis=1)
@@ -130,6 +150,30 @@ if __name__ ==  '__main__':
 
     df['same_topic'] = (df['q1_topic'] == df['q2_topic']).astype(int)
     
+    #Build Distance Feature
+    model = KeyedVectors.load_word2vec_format("glove_vectors.txt", binary=False, limit=100000)
+    q1_list = []
+    q2_list = []
+    for s in df.q1_trimmed.values:
+        q1_list.append(s.split())
+    for s in df.q2_trimmed.values:
+        q2_list.append(s.split())
+    avgw2v_q1 = avg_w2v(q1_list,model,300)
+    avgw2v_q2 = avg_w2v(q2_list,model,300)
+    df_avgw2v = pd.DataFrame()
+    df_avgw2v['q1_vec'] = list(avgw2v_q1)
+    df_avgw2v['q2_vec'] = list(avgw2v_q2)
+    df_q1 = pd.DataFrame(df_avgw2v.q1_vec.values.tolist())
+    df_q2 = pd.DataFrame(df_avgw2v.q2_vec.values.tolist())
+
+    df['wmdistance'] = df.apply(lambda row: get_wmdistance(row[['q1_trimmed', 'q2_trimmed']]) , axis=1)
+    df['dist_cosine'] = [cosine(x, y) for (x, y) in zip(avgw2v_q1,avgw2v_q2)]
+    df['dist_cityblock'] = [cityblock(x, y) for (x, y) in zip(avgw2v_q1,avgw2v_q2)]
+    df['dist_canberra'] = [canberra(x, y) for (x, y) in zip(avgw2v_q1,avgw2v_q2)]
+    df['dist_euclidean'] = [euclidean(x, y) for (x, y) in zip(avgw2v_q1,avgw2v_q2)]
+    df['dist_minkowski'] = [minkowski(x, y) for (x, y) in zip(avgw2v_q1,avgw2v_q2)]
+    df.dist_cosine = df.dist_cosine.fillna(0)
+
     
     # Rearrange Columns
     df = df[['qid1', 'qid2', 'question1','question2', 'q1_cleaned', 'q2_cleaned',
@@ -137,7 +181,9 @@ if __name__ ==  '__main__':
            'lc_substring', 'lc_subsequence', 'jaccard_dist', 'common_words',
            'common_ratio', 'levenshtein', 'fuzz_qratio', 'fuzz_wratio',
            'q2_question_mark_count', 'q1_question_mark_count','question_mark_count_diff',
-           'freq_q1+q2','freq_q1-q2','same_topic','same_starting','same_ending','is_duplicate']]
+           'freq_q1+q2','freq_q1-q2','same_topic','same_starting','same_ending', 'wmdistance',
+           'dist_cosine', 'dist_cityblock' , 'dist_canberra', 'dist_euclidean', 'dist_minkowski',
+           'is_duplicate']]
     
     # Output full dataset
     df.reset_index().to_feather('../data/processed/full_dataset.feather')
