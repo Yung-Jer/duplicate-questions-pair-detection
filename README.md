@@ -5,11 +5,12 @@ The dataset used in this project is available publicly on Kaggle website, provid
 
 ## Data Preparation
 1. Data Validation
-2. Feature Engineering (Topic Modeling, Word Count, Question Starters)
+2. Feature Engineering
 3. Feature Encoding
 4. Data Pre-processing
 5. Feature Selection
 
+For Pre-processing, we mixed around alot of different techniques. After the common pre-processing steps like removing stop words, lemmatization, etc, we used bag-of-words for topic modeling and word2vec to build our embedding layer. Other pre-processing steps include feature scaling numerical features and one-hot-encoding the topics generated.
 
 ## Models
 1. Logistic Regression
