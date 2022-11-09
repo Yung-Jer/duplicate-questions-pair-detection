@@ -49,3 +49,4 @@ We scraped a random sample of questions from stackoverflow (since web crawling i
 
 
 ## Results
+<img src="reports/figures/standalone models.jpg">
