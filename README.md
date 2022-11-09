@@ -19,6 +19,9 @@ The dataset used in this project is available publicly on Kaggle website, provid
 5. BERT
 6. MLP
 7. Siamese BiLSTM
+
+We also tried Manhantann Siamese LSTM and Support Vector Machine but these were discarded due to poor performance or long training times.
+
 ## Overview of Stacking Architecture
 <img src="reports/figures/stacking arch.jpg">
 ## Other tasks performed
