@@ -24,9 +24,11 @@ We also tried Manhantann Siamese LSTM and Support Vector Machine but these were 
 
 ## Overview of Stacking Architecture
 <img src="reports/figures/stacking arch.jpg">
+
 ## Other tasks performed
 1. Web Scraping
 
+We scraped a random sample of questions from stackoverflow (since web crawling is against Quora rules) to test how our model will perform in production.
 
 
 ## Results
