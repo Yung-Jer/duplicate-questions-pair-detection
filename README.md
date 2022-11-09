@@ -24,5 +24,6 @@ The dataset used in this project is available publicly on Kaggle website, provid
 ## Other tasks performed
 1. Web Scraping
 [[reports/figures/stacking arch.jpg]]
+<img src="reports/figures/stacking arch.jpg">
 
 ## Results
