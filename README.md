@@ -1,7 +1,7 @@
 # duplicate-questions-pair-detection
  BT4222 Project
 ## Dataset
-The dataset used in this project is available publicly on Kaggle website, provided by Quora. It consists of 404352 question pairs with 6 fields; unique identifier of the question pair, unique identifier of the first question, unique identifier of the second question, full text of first question, full text of second question, and the duplicate label.
+The dataset used in this project is available publicly on Kaggle website, provided by Quora. It consists of 404352 question pairs with 6 fields; unique identifier of the question pair, unique identifier of the first question, unique identifier of the second question, full text of first question, full text of second question, and the duplicate label. The data can be found here: [Kaggle Quora Competition Website](https://www.kaggle.com/c/quora-question-pairs/data).
 
 ## Data Preparation
 1. Data Validation
@@ -23,3 +23,6 @@ The dataset used in this project is available publicly on Kaggle website, provid
 
 ## Other tasks performed
 1. Web Scraping
+
+
+## Results
