@@ -19,11 +19,11 @@ The dataset used in this project is available publicly on Kaggle website, provid
 5. BERT
 6. MLP
 7. Siamese BiLSTM
-
-
+## Overview of Stacking Architecture
+<img src="reports/figures/stacking arch.jpg">
 ## Other tasks performed
 1. Web Scraping
-[[reports/figures/stacking arch.jpg]]
-<img src="reports/figures/stacking arch.jpg">
+
+
 
 ## Results
