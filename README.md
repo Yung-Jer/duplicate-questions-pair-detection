@@ -12,6 +12,21 @@ The dataset used in this project is available publicly on Kaggle website, provid
 
 For Pre-processing, we mixed around alot of different techniques. After the common pre-processing steps like removing stop words, lemmatization, etc, we used bag-of-words for topic modeling and word2vec to build our embedding layer. Other pre-processing steps include feature scaling numerical features and one-hot-encoding the topics generated.
 
+Here are some example features:
+- NLP Features
+  - Latent Dirichlet Allocation, Topic Modeling
+  - Common Ratio
+  - Frequency
+  - Doc2vec
+  - Word2vec
+  - Similary measures (Jaccard)
+  - Sentiment
+  - Fuzzy
+- Distance Features
+  - Canberra
+  - Euclidean
+  - Cosine
+
 ## Models
 1. Logistic Regression
 2. Random Forest
@@ -20,6 +35,7 @@ For Pre-processing, we mixed around alot of different techniques. After the comm
 5. BERT
 6. MLP
 7. Siamese BiLSTM
+8. Stacking
 
 We also tried Manhantann Siamese LSTM and Support Vector Machine but these were discarded due to poor performance or long training times.
 
